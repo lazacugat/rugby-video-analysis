@@ -4,6 +4,8 @@ Automatic detection of set pieces (**lineout**, **scrum** and **maul**) in broad
 
 The input is a full match video. The output is the time of every lineout, scrum and maul.
 
+![A lineout, a scrum and a maul](docs/examples.jpg)
+
 ## How it works
 
 ```
@@ -23,6 +25,10 @@ events: line from 101 s to 109 s, scrum from 230 s to 245 s, ...
 3. **Training** (`events/build_dataset.py`, `model.py`, `train.py`): YOLO26m-cls (Ultralytics, ImageNet-pretrained) is fine-tuned on 384×384 frames for 15 epochs. All event seconds are used, plus 4 random "nothing" seconds per event second. Frames are stretched rather than cropped, because lineouts often happen at the edge of the image.
 4. **Post-processing** (`events/postprocess.py`): the per-second probabilities are smoothed with a moving average, thresholded, and segments shorter than a minimum duration are dropped. A maul is only accepted if it starts right after a detected lineout.
 5. **Evaluation** (`events/evaluate.py`): an event counts as detected if a detection overlaps its window (for example, lineout = [throw − 5 s, throw + 3 s]). Detections that overlap no event are false alarms. The script also sweeps thresholds and window sizes.
+
+This is what the post-processing looks like on five minutes of a validation match. Thin lines are the raw probabilities, thick lines the smoothed ones, black marks the hand annotations and the coloured bars at the bottom the detections. The maul detected near minute 39.6 is a false alarm:
+
+![Probabilities, annotations and detections over five minutes of a match](docs/timeline.png)
 
 I tried two other approaches before this one. A per-frame feature model built on object detectors (Faster R-CNN / YOLO) had many more false alarms. End-to-end action-spotting models (E2E-Spot, T-DEED) overfitted on this amount of data.
 
@@ -51,7 +57,9 @@ t_start,t_end,class,team,notes
 | Scrum | 289 / 290 (99.7 %) | 0.8 |
 | Maul | 142 / 176 (81 %) | 0.6 |
 
-**Where it fails.** Most missed lineouts come from one camera (two matches at the same venue). That camera films from far away, and lineouts on the far touchline are tiny: the model detects 21 of 46 of them (46 %). Mauls there are missed too, because they depend on the lineout being detected first. In the other 16 matches, the model detects 392 of 407 lineouts (96 %).
+**Where it fails.** Most missed lineouts come from one camera (two matches at the same venue). That camera films from far away, and lineouts on the far touchline are just a small group of players at the back of the image. In those two matches the model detects 21 of 46 lineouts (46 %), and none of the 13 mauls, because mauls are only accepted after a detected lineout. In the other 16 matches, it detects 392 of 407 lineouts (96 %).
+
+![Four lineouts missed by the model, on the far touchline](docs/missed_far_camera.jpg)
 
 ## Work in progress (not in this repository yet)
 
